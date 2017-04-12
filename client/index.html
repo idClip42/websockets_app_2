@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<script src="/socket.io/socket.io.js"></script>
+    <script src="https://npmcdn.com/babel-core@5.8.38/browser.min.js"></script>
+    <script type="text/babel" >
+        "use strict";
+
+
+        let canvas;
+        let ctx;
+
+        let players = {};
+        let ball = Object.seal({
+            x: 0,
+            y: 0,
+            tx: 0,
+            ty: 0,
+            r: 15
+        });
+
+    	const init = () => {
+    		const socket = io.connect();
+
+            // Recieves info on a new position of an object
+    		socket.on("update", (data) => {
+                console.log(data);
+    		});
+
+    		canvas = document.querySelector("canvas");
+    		ctx = canvas.getContext("2d");
+
+            canvas.width = 800;
+            canvas.height = 600;
+
+
+            canvas.onmousemove = (e) =>{
+                let mouseX = e.offsetX;
+                let mouseY = e.offsetY;
+            }
+
+
+    		update();
+    	};
+
+    	window.onload = init;
+
+    	const update = () => {
+    		requestAnimationFrame(update);
+
+    		ctx.clearRect(0,0, canvas.width, canvas.height);
+
+
+    	};
+
+
+
+
+    </script>
+</head>
+<body>
+
+<canvas style="border: solid">Get a real browser!</canvas>
+
+</body>
+</html>
