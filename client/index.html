@@ -12,20 +12,28 @@
 
         let players = {};
         let ball = Object.seal({
-            x: 0,
-            y: 0,
+            x: 0.5,
+            y: 0.5,
             tx: 0,
             ty: 0,
-            r: 15
+            radius: 15,
+            color: "orange"
+        });
+        let mouse = Object.seal({
+            x: 0,
+            y: 0
         });
 
     	const init = () => {
     		const socket = io.connect();
 
-            // Recieves info on a new position of an object
-    		socket.on("update", (data) => {
-                console.log(data);
-    		});
+            socket.on("update", (data) => {
+                updateObjects(data.ball, data.players);
+            });
+
+            socket.on("delete", (data) => {
+                delete players[data];
+            });
 
     		canvas = document.querySelector("canvas");
     		ctx = canvas.getContext("2d");
@@ -35,9 +43,12 @@
 
 
             canvas.onmousemove = (e) =>{
-                let mouseX = e.offsetX;
-                let mouseY = e.offsetY;
+                mouse.x = e.offsetX;
+                mouse.y = e.offsetY;
+                socket.emit("update", mouse);
             }
+
+            socket.emit("joinGame");
 
 
     		update();
@@ -50,15 +61,84 @@
 
     		ctx.clearRect(0,0, canvas.width, canvas.height);
 
+            drawCircle(mouse.x, mouse.y, 5, "black");
 
+            moveObjects();
+
+            drawObjects();
     	};
+
+
+        const updateObjects = (newBall, newPlayers) => {
+            ball.tx = newBall.x;
+            ball.ty = newBall.y;
+            ball.color = newBall.color;
+
+            let keys = Object.keys(newPlayers);
+            for(let n = 0; n < keys.length; ++n){
+                if(!players[keys[n]])
+                    players[keys[n]] = {
+                        x: newPlayers[keys[n]].x,
+                        y: newPlayers[keys[n]].y,
+                        radius: newPlayers[keys[n]].radius,
+                        color: newPlayers[keys[n]].color
+                    };
+                players[keys[n]].tx = newPlayers[keys[n]].x;
+                players[keys[n]].ty = newPlayers[keys[n]].y;
+            }
+        };
+
+        const moveObjects = () => {
+            const lerpVal = 0.2;
+
+            ball.x += (ball.tx - ball.x) * lerpVal;
+            ball.y += (ball.ty - ball.y) * lerpVal;
+
+            let keys = Object.keys(players);
+            for(let n = 0; n < keys.length; ++n){
+                players[keys[n]].x += (players[keys[n]].tx - players[keys[n]].x) * lerpVal;
+                players[keys[n]].y += (players[keys[n]].ty - players[keys[n]].y) * lerpVal;
+            }
+        };
+
+        const drawObjects = () => {
+            drawCircle(
+                ball.x,
+                ball.y,
+                ball.radius,
+                ball.color);
+
+            let keys = Object.keys(players);
+            for(let n = 0; n < keys.length; ++n){
+                let p = players[keys[n]];
+                drawCircle(
+                p.x,
+                p.y,
+                p.radius,
+                p.color);
+            }
+        };
+
+        const drawCircle = (x,y,r,color) => {
+            ctx.save();
+            ctx.fillStyle = color;
+            ctx.beginPath();
+            ctx.arc(x, y, r, 0, 2*Math.PI);
+            ctx.fill();
+            ctx.restore();
+        };
 
 
 
 
     </script>
+    <title>Barasket Oballma</title>
 </head>
 <body>
+
+Welcome to...<br>
+BARASKET OBALLMA!<br>
+A game of sports<br>
 
 <canvas style="border: solid">Get a real browser!</canvas>
 
