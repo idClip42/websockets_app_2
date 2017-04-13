@@ -153,7 +153,7 @@ const ballCollisions = () => {
       ball.xSpeed = (ball.xSpeed * ball.mass + p.xSpeed * p.mass) / ball.mass;
       ball.ySpeed = (ball.ySpeed * ball.mass + p.ySpeed * p.mass) / ball.mass;
 
-      const pythag = Math.sqrt((ball.x - p.x) ** 2 + (ball.y - p.y) ** 2);
+      const pythag = Math.sqrt((ball.x - p.x) * (ball.x - p.x) + (ball.y - p.y) * (ball.y - p.y));
       ball.x = p.x + (ball.x - p.x) / pythag * (p.radius + ball.radius);
       ball.y = p.y + (ball.y - p.y) / pythag * (p.radius + ball.radius);
     }
@@ -184,8 +184,8 @@ const checkCollision = (obj1, obj2) => {
   if (Math.abs(obj1.y - obj2.y) > maxDist) return false;
 
   // Checks distance between centers with squared values
-  const distSqr = obj2.x - obj1.x ** 2 + obj2.y - obj1.y ** 2;
+  const distSqr = Math.pow(obj2.x - obj1.x, 2) + Math.pow(obj2.y - obj1.y, 2);
   const radiiSum = obj1.radius + obj2.radius;
-  if (distSqr < radiiSum ** 2) return true;
+  if (distSqr < Math.pow(radiiSum, 2)) return true;
   return false;
 };
