@@ -28,6 +28,8 @@ const arena = fs.readFileSync(`${__dirname}/../client/images/coliseum.jpg`);
 const onRequest = (request, response) => {
   const parsedUrl = url.parse(request.url);
 
+  console.log(`Requested: ${request.url}`);
+
   let data;
   let type;
 
@@ -63,8 +65,6 @@ const onRequest = (request, response) => {
 const app = http.createServer(onRequest).listen(port);
 
 console.log(`Listening on 127.0.0.1: ${port}`);
-
-const io = socketio(app);
 
 
 /*
@@ -149,6 +149,8 @@ const square = value => value * value;
 */
 
 
+const io = socketio(app);
+
 io.sockets.on('connection', (socket) => {
   console.log('connected');
 
@@ -205,7 +207,7 @@ const respawnBall = () => {
 };
 
 
-// / Checks collisions between two circle objects
+// Checks collisions between two circle objects
 const checkCollision = (obj1, obj2) => {
   // Makes sure a and b exist
   if (!obj1 || !obj2) return false;
@@ -227,7 +229,7 @@ const checkCollision = (obj1, obj2) => {
 // Hitting the small spot inside the basket scores a point and resets everything
 const ballCollisions = () => {
   const keys = Object.keys(players);
-  for (let n = 0; n < keys.length; n += n) {
+  for (let n = 0; n < keys.length; n += 1) {
     const p = players[keys[n]];
     if (checkCollision(ball, p) === true) {
       ball.xSpeed = ((ball.xSpeed * ball.mass) + (p.xSpeed * p.mass)) / ball.mass;
@@ -255,8 +257,6 @@ const ballCollisions = () => {
 const applyPhysics = (object) => {
   const obj = object;
   if (obj.target) {
-    // obj.xAccel = (obj.target.x - obj.x) * Math.abs(obj.target.x - obj.x);
-    // obj.yAccel = (obj.target.y - obj.y) * Math.abs(obj.target.y - obj.y);
     obj.xSpeed = (obj.target.x - obj.x) * 10;
     obj.ySpeed = (obj.target.y - obj.y) * 10;
   }
