@@ -10,28 +10,57 @@
         let canvas;
         let ctx;
 
+        // List of players in the game and their info
         let players = {};
+
+        // The ball and its info
         let ball = Object.seal({
-            x: 0.5,
-            y: 0.5,
-            tx: 0,
-            ty: 0,
+            x: 0.5,     // x and y are where the ball
+            y: 0.5,     // currently is on screen
+            tx: 0,      // tx and ty are where the ball
+            ty: 0,      // should be, according to server physics
             radius: 15,
             color: "orange"
         });
+
+        // The mouse coordinates
         let mouse = Object.seal({
             x: 0,
             y: 0
         });
 
+        // The scores of each team
+        let score = [0,0];
+
+        // Nicolas Cage himself, here to cheer you on personally
+        let nic = Object.seal({
+            x: 0,
+            y: 0,
+            radius: 200,
+            a: 0
+        });
+
+        // Images for the game
+        let ballImage;
+        let handImage;
+        let nicImage;
+        let arenaImage;
+
     	const init = () => {
     		const socket = io.connect();
 
             socket.on("update", (data) => {
+                // Checks to see if a score happened and updates the score array
+                if(score[0] != data.teamScore[0] || score[1] != data.teamScore[1]) 
+                    scored();
+                score = data.teamScore;
+
+                // Updates the game objects with newly recieved data
                 updateObjects(data.ball, data.players);
             });
 
             socket.on("delete", (data) => {
+                // removes given player from players array
                 delete players[data];
             });
 
@@ -41,15 +70,20 @@
             canvas.width = 800;
             canvas.height = 600;
 
+            ballImage = document.querySelector("#barry");
+            handImage = document.querySelector("#hand");
+            nicImage = document.querySelector("#nic");
+            arenaImage = document.querySelector("#arena");
 
+            // Emits to the server whenever the mouse moves to a new position
             canvas.onmousemove = (e) =>{
                 mouse.x = e.offsetX;
                 mouse.y = e.offsetY;
                 socket.emit("update", mouse);
             }
 
+            // Lets the server know we're joining the game so it can add us
             socket.emit("joinGame");
-
 
     		update();
     	};
@@ -61,19 +95,28 @@
 
     		ctx.clearRect(0,0, canvas.width, canvas.height);
 
-            drawCircle(mouse.x, mouse.y, 5, "black");
-
             moveObjects();
 
             drawObjects();
+
+            drawText();
+
+            // Draws a  black dot where the mouse is
+            drawCircle(mouse.x, mouse.y, 5, "black");
     	};
 
 
         const updateObjects = (newBall, newPlayers) => {
+            // Updates values for the ball
+            // Note that the ball's target position is updated to the given x and y position
+            // The ball will now lerp towards this position
             ball.tx = newBall.x;
             ball.ty = newBall.y;
             ball.color = newBall.color;
+            ball.radius = newBall.radius;
 
+            // The same goes for each of the players
+            // (Though it also creates a player if it hasn't been added yet)
             let keys = Object.keys(newPlayers);
             for(let n = 0; n < keys.length; ++n){
                 if(!players[keys[n]])
@@ -88,6 +131,7 @@
             }
         };
 
+        // Lerps the ball and players towards the positions the server gives
         const moveObjects = () => {
             const lerpVal = 0.2;
 
@@ -101,13 +145,21 @@
             }
         };
 
+        // Draws everything
         const drawObjects = () => {
-            drawCircle(
-                ball.x,
-                ball.y,
-                ball.radius,
-                ball.color);
 
+            // Draws a faded background so that it makes it easier to see what's going on
+            ctx.globalAlpha = 0.3;
+            ctx.drawImage(arenaImage, 0, 0, canvas.width, canvas.height);
+            ctx.globalAlpha = 1;
+
+            // Updates the alpha of and draws Nic
+            updateNic();
+
+            // Draws the ball
+            drawImage(ballImage, ball);
+
+            // Draws each of the players, a hand in a colored ball
             let keys = Object.keys(players);
             for(let n = 0; n < keys.length; ++n){
                 let p = players[keys[n]];
@@ -116,6 +168,9 @@
                 p.y,
                 p.radius,
                 p.color);
+
+                if(keys[n].length > 10) // Makes sure we're just drawing players
+                    drawImage(handImage, players[keys[n]]);
             }
         };
 
@@ -128,17 +183,65 @@
             ctx.restore();
         };
 
+        const drawText = () => {
+            ctx.font = "60px Arial";
+            ctx.textAlign = "center";
+            ctx.fillText(score[0] + " : " + score[1], 400, 100);
+        };
+
+        // Draws an image based on a center point and radius
+        const drawImage = (img, obj) => {
+            ctx.drawImage(img, obj.x - obj.radius, obj.y - obj.radius, obj.radius*2, obj.radius*2);
+        };
+
+        // When someone scores, Nic's alpha becomes 1 and he moves to a random spot onscreen
+        const scored = () => {
+            nic.x = Math.floor(Math.random() * canvas.width);
+            nic.y = Math.floor(Math.random() * canvas.height);
+            nic.a = 1;
+        };
+
+        // Each frme, Nic fades away a little more and is drawn to the screen
+        const updateNic = () => {
+            ctx.globalAlpha = nic.a;
+            drawImage(nicImage, nic);
+            ctx.globalAlpha = 1;
+            nic.a *= 0.95;
+        };
+
 
 
 
     </script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css?family=Concert+One');
+        body{
+            font-family: 'Concert One', cursive;
+            font-size: 18pt;
+        }
+        h1{
+            font-size: 30pt;
+            margin: 5px;
+        }
+        div{
+            margin: 10px;
+        }
+    </style>
+
     <title>Barasket Oballma</title>
 </head>
 <body>
 
+<div>
 Welcome to...<br>
-BARASKET OBALLMA!<br>
+<h1>BARASKET OBALLMA!</h1>
 A game of sports<br>
+</div>
+<img id="barry" src="/barry" alt="Barry the Ball" hidden>
+<img id="hand" src="/hand" alt="Handy the Hand" hidden>
+<img id="nic" src="/nic" alt="Nicky the Cage" hidden>
+<img id="arena" src="/arena" alt="Arena the Arena" hidden>
 
 <canvas style="border: solid">Get a real browser!</canvas>
 

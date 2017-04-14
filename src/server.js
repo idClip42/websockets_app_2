@@ -1,17 +1,62 @@
+
+
+/*
+
+
+    SERVER AND PAGE REQUESTS
+
+
+*/
+
+
 const http = require('http');
 const fs = require('fs');
 const socketio = require('socket.io');
+const url = require('url');
 
 const port = process.env.PORT || process.env.NODE_PORT || 3000;
 
+// File imports
 let index = fs.readFileSync(`${__dirname}/../client/index.html`);
+const barry = fs.readFileSync(`${__dirname}/../client/images/barasketball.png`);
+const hand = fs.readFileSync(`${__dirname}/../client/images/hand.png`);
+const nic = fs.readFileSync(`${__dirname}/../client/images/nic.png`);
+const arena = fs.readFileSync(`${__dirname}/../client/images/coliseum.jpg`);
 
+
+// Returns page and images on request
 const onRequest = (request, response) => {
-  // Reloads web page on each request to preserve developer sanity
-  index = fs.readFileSync(`${__dirname}/../client/index.html`);
+  const parsedUrl = url.parse(request.url);
 
-  response.writeHead(200, { 'Content-Type': 'text/html' });
-  response.write(index);
+  let data;
+  let type;
+
+  switch (parsedUrl.pathname) {
+    case '/barry':
+      data = barry;
+      type = 'image/png';
+      break;
+    case '/hand':
+      data = hand;
+      type = 'image/png';
+      break;
+    case '/nic':
+      data = nic;
+      type = 'image/png';
+      break;
+    case '/arena':
+      data = arena;
+      type = 'image/jpeg';
+      break;
+    default:
+      // Imports index each time so I don't have to restart server for html changes
+      index = fs.readFileSync(`${__dirname}/../client/index.html`);
+      data = index;
+      type = 'text/html';
+  }
+
+  response.writeHead(200, { 'Content-Type': type });
+  response.write(data);
   response.end();
 };
 
@@ -21,6 +66,17 @@ console.log(`Listening on 127.0.0.1: ${port}`);
 
 const io = socketio(app);
 
+
+/*
+
+
+    VARIABLES AND CONSTRUCTORS
+
+
+*/
+
+
+// The constructor function for objects in the game
 const objMaker = (x, y, r, m, a, c) => Object.seal({
   x,
   y,
@@ -35,41 +91,94 @@ const objMaker = (x, y, r, m, a, c) => Object.seal({
   color: c,
 });
 
+// Canvas width and height
 const WIDTH = 800;
 const HEIGHT = 600;
+
+// Players currently in the game - contains objects defined by objMaker
 const players = {};
+
+// The ball object
 const ball = objMaker(
   WIDTH / 2,
   0,
-  15,
-  5,
-  200,
+  30,
+  8,
+  300,
   'orange');
+
+// The "framerate" - updates 60 times a second
 const frameTime = 1000 / 60;
+
+// How many players on each team
+const teamCount = [0, 0];
+
+// The score for each team
+const teamScore = [0, 0];
+
+
+/*
+
+
+    HELPERS
+
+
+*/
+
+
+// Gets a random color, but tinted blue if team1 and tinted red if team2
+const getRandomColor = (team1) => {
+  const r = (team1 === false) ? Math.floor(Math.random() * 100) + 155 : 0;
+  const g = Math.floor(Math.random() * 100);
+  const b = (team1 === true) ? Math.floor(Math.random() * 100) + 155 : 0;
+
+  const string = `rgb(${r}, ${g},${b})`;
+
+  return string;
+};
+
+const square = value => value * value;
+
+
+/*
+
+
+    SOCKETS
+
+
+*/
+
 
 io.sockets.on('connection', (socket) => {
   console.log('connected');
 
-  // When an answer is recieved from the client, it puts it in the answers array
+  // Upon recieving update from player, update player motion
   socket.on('update', (data) => {
     const obj = players[socket.id];
     if (!obj) return;
     obj.target = data;
   });
 
-  // When the game is joined, puts user in a room and adds them to list
+  // When the game is joined, puts user in a room and creates player object
   socket.on('joinGame', () => {
     socket.join('room1');
+
+    const team = (teamCount[0] > teamCount[1]) ? 1 : 0;
+    teamCount[team] += 1;
+
     players[socket.id] = objMaker(
       WIDTH / 2,
       HEIGHT,
       30,
       1,
       0,
-      'blue');
+      getRandomColor(team === 0));
+    players[socket.id].team = team;
   });
 
+  // On disconnect, removes player from players list and lowers their team member count
   socket.on('disconnect', () => {
+    if (players[socket.id]) { teamCount[players[socket.id].team] -= 1; }
     delete players[socket.id];
     io.sockets.emit('delete', socket.id);
   });
@@ -79,101 +188,24 @@ io.sockets.on('connection', (socket) => {
 console.log('Websocket server started');
 
 
-const addBaskets = () => {
-  // players["basket1"] = objMaker(x, y, r, m, a, c);
-  let topLeftX = 30;
-  const topLeftY = 200;
-  const rad = 10;
-  const width = 50;
-  players.basket1 = objMaker(topLeftX, topLeftY, rad, 10, 0, 'gray');
-  players.basket2 = objMaker(topLeftX, topLeftY + rad * 2, rad, 10, 0, 'gray');
-  players.basket3 = objMaker(topLeftX + width, topLeftY, rad, 10, 0, 'gray');
-  players.basket4 = objMaker(topLeftX + width, topLeftY + rad * 2, rad, 10, 0, 'gray');
-  players.basket5 = objMaker(topLeftX, topLeftY + rad * 4, rad, 10, 0, 'gray');
-  players.basket6 = objMaker(topLeftX + width, topLeftY + rad * 4, rad, 10, 0, 'gray');
-
-  topLeftX = 720;
-
-  players.basket11 = objMaker(topLeftX, topLeftY, rad, 10, 0, 'gray');
-  players.basket12 = objMaker(topLeftX, topLeftY + rad * 2, rad, 10, 0, 'gray');
-  players.basket13 = objMaker(topLeftX + width, topLeftY, rad, 10, 0, 'gray');
-  players.basket14 = objMaker(topLeftX + width, topLeftY + rad * 2, rad, 10, 0, 'gray');
-  players.basket15 = objMaker(topLeftX, topLeftY + rad * 4, rad, 10, 0, 'gray');
-  players.basket16 = objMaker(topLeftX + width, topLeftY + rad * 4, rad, 10, 0, 'gray');
-};
-addBaskets();
+/*
 
 
-const gameLoop = () => {
-  doPhysics();
-  const obj = {
-    ball,
-    players,
-  };
-  io.sockets.emit('update', obj);
-};
-setInterval(gameLoop, frameTime);
+    PHYSICS
 
 
-const doPhysics = () => {
-  ballCollisions();
-  applyPhysics(ball);
+*/
 
-  const keys = Object.keys(players);
-  for (let n = 0; n < keys.length; ++n) {
-    applyPhysics(players[keys[n]]);
-  }
-
-  respawnBall();
-};
-
-const applyPhysics = (obj) => {
-  if (obj.target) {
-    // obj.xAccel = (obj.target.x - obj.x) * Math.abs(obj.target.x - obj.x);
-    // obj.yAccel = (obj.target.y - obj.y) * Math.abs(obj.target.y - obj.y);
-    obj.xSpeed = (obj.target.x - obj.x) * 10;
-    obj.ySpeed = (obj.target.y - obj.y) * 10;
-  }
-
-  obj.xSpeed += obj.xAccel * frameTime / 1000;
-  obj.xSpeed -= obj.xSpeed * obj.drag * frameTime / 1000;
-
-  obj.ySpeed += obj.yAccel * frameTime / 1000;
-  obj.ySpeed -= obj.ySpeed * obj.drag * frameTime / 1000;
-
-  obj.x += obj.xSpeed * frameTime / 1000;
-  obj.y += obj.ySpeed * frameTime / 1000;
-};
-
-const ballCollisions = () => {
-  const keys = Object.keys(players);
-  for (let n = 0; n < keys.length; ++n) {
-    const p = players[keys[n]];
-    if (checkCollision(ball, p) == true) {
-      ball.xSpeed = (ball.xSpeed * ball.mass + p.xSpeed * p.mass) / ball.mass;
-      ball.ySpeed = (ball.ySpeed * ball.mass + p.ySpeed * p.mass) / ball.mass;
-
-      const pythag = Math.sqrt((ball.x - p.x) * (ball.x - p.x) + (ball.y - p.y) * (ball.y - p.y));
-      ball.x = p.x + (ball.x - p.x) / pythag * (p.radius + ball.radius);
-      ball.y = p.y + (ball.y - p.y) / pythag * (p.radius + ball.radius);
-    }
-  }
-};
-
+// Moves ball to position at top middle
 const respawnBall = () => {
-  if (ball.y > HEIGHT) {
-    ball.y = 0;
-    ball.x = WIDTH / 2;
-    ball.xSpeed = 0;
-    ball.ySpeed = 0;
-  }
-
-  if ((ball.x < 0 && ball.xSpeed < 0) || (ball.x > WIDTH && ball.xSpeed > 0)) { ball.xSpeed *= -1; }
-  if (ball.y < 0 && ball.ySpeed < 0) { ball.ySpeed *= -1; }
+  ball.y = 0;
+  ball.x = WIDTH / 2;
+  ball.xSpeed = 0;
+  ball.ySpeed = 0;
 };
 
 
-// / Checks collisions between two circles, with given points and radii
+// / Checks collisions between two circle objects
 const checkCollision = (obj1, obj2) => {
   // Makes sure a and b exist
   if (!obj1 || !obj2) return false;
@@ -184,8 +216,147 @@ const checkCollision = (obj1, obj2) => {
   if (Math.abs(obj1.y - obj2.y) > maxDist) return false;
 
   // Checks distance between centers with squared values
-  const distSqr = Math.pow(obj2.x - obj1.x, 2) + Math.pow(obj2.y - obj1.y, 2);
+  const distSqr = square(obj2.x - obj1.x) + square(obj2.y - obj1.y);
   const radiiSum = obj1.radius + obj2.radius;
-  if (distSqr < Math.pow(radiiSum, 2)) return true;
+  if (distSqr < square(radiiSum)) return true;
   return false;
 };
+
+// Checks if the ball collides with anything
+// Players can knock it around
+// Hitting the small spot inside the basket scores a point and resets everything
+const ballCollisions = () => {
+  const keys = Object.keys(players);
+  for (let n = 0; n < keys.length; n += n) {
+    const p = players[keys[n]];
+    if (checkCollision(ball, p) === true) {
+      ball.xSpeed = ((ball.xSpeed * ball.mass) + (p.xSpeed * p.mass)) / ball.mass;
+      ball.ySpeed = ((ball.ySpeed * ball.mass) + (p.ySpeed * p.mass)) / ball.mass;
+
+      const pythag = Math.sqrt(square(ball.x - p.x) + square(ball.y - p.y));
+      ball.x = p.x + (((ball.x - p.x) / pythag) * (p.radius + ball.radius));
+      ball.y = p.y + (((ball.y - p.y) / pythag) * (p.radius + ball.radius));
+    }
+  }
+  if (checkCollision(ball, players.redBasket) === true) {
+    teamScore[1] += 1;
+    respawnBall();
+  }
+  if (checkCollision(ball, players.blueBasket) === true) {
+    teamScore[0] += 1;
+    respawnBall();
+  }
+};
+
+// Applies physics
+// If there's a target, moves towards it
+// Adds acceleration and drag to speed, and adds speed to position
+// The ball has gravity applied to it, which might be the only use of acceleration here
+const applyPhysics = (object) => {
+  const obj = object;
+  if (obj.target) {
+    // obj.xAccel = (obj.target.x - obj.x) * Math.abs(obj.target.x - obj.x);
+    // obj.yAccel = (obj.target.y - obj.y) * Math.abs(obj.target.y - obj.y);
+    obj.xSpeed = (obj.target.x - obj.x) * 10;
+    obj.ySpeed = (obj.target.y - obj.y) * 10;
+  }
+
+  obj.xSpeed += obj.xAccel * (frameTime / 1000);
+  obj.xSpeed -= obj.xSpeed * obj.drag * (frameTime / 1000);
+
+  obj.ySpeed += obj.yAccel * (frameTime / 1000);
+  obj.ySpeed -= obj.ySpeed * obj.drag * (frameTime / 1000);
+
+  obj.x += obj.xSpeed * (frameTime / 1000);
+  obj.y += obj.ySpeed * (frameTime / 1000);
+};
+
+// Keeps the ball in boundaries
+// Moving out of bounds on the left, right, or top
+//  reverses the velocity in that direction so it looks like a bounce
+// Moving out of bounds on the bottom resets the ball
+const ballBoundaries = () => {
+  if (ball.y > HEIGHT) { respawnBall(); }
+
+  if ((ball.x < 0 && ball.xSpeed < 0) || (ball.x > WIDTH && ball.xSpeed > 0)) { ball.xSpeed *= -1; }
+  if (ball.y < 0 && ball.ySpeed < 0) { ball.ySpeed *= -1; }
+};
+
+
+// Deals with physics
+// Manages ball collisions with players, baskets, etc
+// Moves players around, towards their targets (the corresponding mouse location)
+// Keeps the ball onscreen
+const doPhysics = () => {
+  ballCollisions();
+  applyPhysics(ball);
+
+  const keys = Object.keys(players);
+  for (let n = 0; n < keys.length; n += 1) {
+    applyPhysics(players[keys[n]]);
+  }
+
+  ballBoundaries();
+};
+
+
+/*
+
+
+    RUNNING THE GAME
+
+
+*/
+
+
+// Adds objects to players array that serve as baskets for the game,
+// along with the invisible objects that the ball must hit inside the basket to gain a point
+const addBaskets = () => {
+  let topLeftX = 30;
+  const topLeftY = 300;
+  const rad = 10;
+  const width = 100;
+  let color = 'blue';
+  players.basket1 = objMaker(topLeftX, topLeftY, rad, 10, 0, color);
+  players.basket2 = objMaker(topLeftX, topLeftY + (rad * 4), rad, 10, 0, color);
+  players.basket3 = objMaker(topLeftX + width, topLeftY, rad, 10, 0, color);
+  players.basket4 = objMaker(topLeftX + width, topLeftY + (rad * 4), rad, 10, 0, color);
+  players.basket5 = objMaker(topLeftX, topLeftY + (rad * 8), rad, 10, 0, color);
+  players.basket6 = objMaker(topLeftX + width, topLeftY + (rad * 8), rad, 10, 0, color);
+  players.basket7 = objMaker(topLeftX, topLeftY + (rad * 12), rad, 10, 0, color);
+  players.basket8 = objMaker(topLeftX + width, topLeftY + (rad * 12), rad, 10, 0, color);
+  players.basket9 = objMaker(topLeftX + (width / 2), topLeftY + (rad * 12),
+    width / 3, 10, 0, color);
+  players.redBasket = objMaker(topLeftX + (width / 2), topLeftY + (rad * 8),
+    5, 10, 0, 'rgba(0,0,0,0)');
+
+  topLeftX = 670;
+  color = 'red';
+  players.basket11 = objMaker(topLeftX, topLeftY, rad, 10, 0, color);
+  players.basket12 = objMaker(topLeftX, topLeftY + (rad * 4), rad, 10, 0, color);
+  players.basket13 = objMaker(topLeftX + width, topLeftY, rad, 10, 0, color);
+  players.basket14 = objMaker(topLeftX + width, topLeftY + (rad * 4), rad, 10, 0, color);
+  players.basket15 = objMaker(topLeftX, topLeftY + (rad * 8), rad, 10, 0, color);
+  players.basket16 = objMaker(topLeftX + width, topLeftY + (rad * 8), rad, 10, 0, color);
+  players.basket17 = objMaker(topLeftX, topLeftY + (rad * 12), rad, 10, 0, color);
+  players.basket18 = objMaker(topLeftX + width, topLeftY + (rad * 12), rad, 10, 0, color);
+  players.basket19 = objMaker(topLeftX + (width / 2), topLeftY + (rad * 12),
+    width / 3, 10, 0, color);
+  players.blueBasket = objMaker(topLeftX + (width / 2), topLeftY + (rad * 8), 5, 10, 0, 'rgba(0,0,0,0)');
+};
+addBaskets();
+
+
+// Runs the game loop every time interval
+// Applies physics and sends out newly updated positions for everything
+const gameLoop = () => {
+  doPhysics();
+  const obj = {
+    ball,
+    players,
+    teamScore,
+  };
+  io.sockets.emit('update', obj);
+};
+setInterval(gameLoop, frameTime);
+
